@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Inline Notes
 // @namespace    https://zethet.nl/
-// @version      1.0.3
+// @version      1.0.4
 // @description  Interne ZetHet-aanpassing voor inline notities in Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
@@ -190,8 +190,10 @@
    }
 
    function isOfferteOrOrder(doc) {
-     const title = doc.title || '';
-     return title.includes('Offerte') || title.includes('Order');
+     const titleElement = doc.querySelector('span.HdrTitle');
+     if (!titleElement) return false;
+     const titleText = titleElement.textContent || '';
+     return titleText.includes('Offerte') || titleText.includes('Verkooporder');
    }
 
    function enhanceOrderGrid(doc) {
