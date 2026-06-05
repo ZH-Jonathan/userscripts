@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Inline Notes
 // @namespace    https://zethet.nl/
-// @version      1.0.1
+// @version      1.0.2
 // @description  Interne ZetHet-aanpassing voor inline notities in Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
@@ -178,8 +178,21 @@
      updateNoteIcons(rowId, hiddenInput, doc);
    }
 
+   function cleanupRemovedNotes(doc) {
+     const noteRows = Array.from(doc.querySelectorAll("tr[id^='zh-inline-note-']"));
+     noteRows.forEach((noteRow) => {
+       const forRowId = noteRow.dataset.forRow;
+       const originalRow = doc.getElementById(forRowId);
+       if (!originalRow) {
+         noteRow.remove();
+       }
+     });
+   }
+
    function enhanceOrderGrid(doc) {
      injectStyles(doc);
+
+     cleanupRemovedNotes(doc);
 
      const rows = Array.from(doc.querySelectorAll("tr.GridRow[id^='grd_r']"));
      rows.forEach((row) => createInlineNoteForRow(row, doc));
