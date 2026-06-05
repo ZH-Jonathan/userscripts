@@ -43,16 +43,7 @@
        }
 
        .zh-inline-note-label::after {
-         content: "ZetHet";
-         display: inline-block;
-         color: #d97048;
-         border: 1px solid #d97048;
-         border-radius: 999px;
-         padding: 1px 6px;
-         font-size: 10px;
-         font-weight: 600;
-         line-height: 1.4;
-         opacity: 0.85;
+         display: none;
        }
 
        .zh-inline-note-textarea {
@@ -66,6 +57,10 @@
          font: inherit;
          background: #fff;
          border-left: 2px solid #d97048;
+       }
+
+       .zh-inline-note-textarea.zh-empty {
+         min-height: 30px;
        }
 
        .zh-inline-note-textarea:focus {
@@ -134,7 +129,7 @@
 
      const label = doc.createElement("div");
      label.className = "zh-inline-note-label";
-     label.textContent = "Notitie";
+     label.textContent = "";
 
      const textarea = doc.createElement("textarea");
      textarea.className = "zh-inline-note-textarea";
@@ -142,15 +137,28 @@
      textarea.value = hiddenInput.value || "";
      textarea.rows = 3;
 
+     const updateTextareaState = () => {
+       const hasValue = textarea.value && textarea.value.trim().length > 0;
+       if (hasValue) {
+         textarea.classList.remove("zh-empty");
+         textarea.style.height = "auto";
+         textarea.style.height = `${textarea.scrollHeight}px`;
+       } else {
+         textarea.classList.add("zh-empty");
+       }
+     };
+
      const autoResizeTextarea = () => {
        textarea.style.height = "auto";
        textarea.style.height = `${textarea.scrollHeight}px`;
      };
 
-     requestAnimationFrame(autoResizeTextarea);
+     requestAnimationFrame(() => {
+       updateTextareaState();
+     });
 
      textarea.addEventListener("input", () => {
-       autoResizeTextarea();
+       updateTextareaState();
        hiddenInput.value = textarea.value;
        hiddenInput.setAttribute("value", textarea.value);
 
