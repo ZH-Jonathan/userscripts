@@ -48,7 +48,7 @@
 
        .zh-inline-note-textarea {
          width: 100%;
-         min-height: 76px;
+         min-height: 30px;
          box-sizing: border-box;
          resize: none;
          border: 1px solid #c8c8c8;
@@ -135,7 +135,6 @@
      textarea.className = "zh-inline-note-textarea";
      textarea.placeholder = "Notitie voor deze orderregel";
      textarea.value = hiddenInput.value || "";
-     textarea.rows = 3;
 
      const updateTextareaState = () => {
        const hasValue = textarea.value && textarea.value.trim().length > 0;
