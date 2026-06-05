@@ -7,8 +7,8 @@
 // @run-at       document-idle
 // @allFrames    true
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/ZetHet/userscripts/main/zethet-exact-inline-notes.user.js
-// @downloadURL  https://raw.githubusercontent.com/ZetHet/userscripts/main/zethet-exact-inline-notes.user.js
+// @updateURL    https://raw.githubusercontent.com/ZH-Jonathan/userscripts/main/exact/zethet-exact-inline-notes.user.js
+// @downloadURL  https://raw.githubusercontent.com/ZH-Jonathan/userscripts/main/exact/zethet-exact-inline-notes.user.js
 // ==/UserScript==
 
 (function () {
