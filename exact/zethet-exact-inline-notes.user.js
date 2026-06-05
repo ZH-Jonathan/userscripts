@@ -26,10 +26,7 @@
        }
 
        .zh-inline-note-wrapper {
-         display: grid;
-         grid-template-columns: 90px 1fr;
-         gap: 8px;
-         align-items: start;
+         display: block;
          font-family: inherit;
        }
 
@@ -48,7 +45,7 @@
 
        .zh-inline-note-textarea {
          width: 100%;
-         min-height: 30px;
+         height: 30px;
          box-sizing: border-box;
          resize: none;
          border: 1px solid #c8c8c8;
@@ -60,7 +57,7 @@
        }
 
        .zh-inline-note-textarea.zh-empty {
-         min-height: 30px;
+         height: 30px;
        }
 
        .zh-inline-note-textarea:focus {
