@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Inline Notes
 // @namespace    https://zethet.nl/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Interne ZetHet-aanpassing voor inline notities in Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
