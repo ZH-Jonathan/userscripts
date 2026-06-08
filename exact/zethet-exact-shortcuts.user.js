@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Sneltoetsen
 // @namespace    https://zethet.nl/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Interne ZetHet-aanpassing: configureerbare sneltoetsen voor Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
@@ -14,6 +14,27 @@
 (function () {
   const STORAGE_KEY = 'zh-exact-shortcuts';
   const CONFIG_COMBO = 'Alt+,';
+
+  const PRESETS = [
+    {
+      id: 'fill-from-above',
+      label: 'Rij erboven kopiëren',
+      description: 'Vult de huidige rij met de data van de rij erboven',
+      defaultKeys: 'Shift+B',
+      action: 'fill-from-above',
+    },
+  ];
+
+  const SKIP_FIELD_SUFFIXES = new Set([
+    'K', 'Deleted',
+    'AmountFCDisplay', 'AmountVATShow', 'AmountIncludingVATFCDisplay',
+    'CostPriceFC', 'CostPriceFCDisplay',
+    'Margin', 'MarginAmount', 'AmountFC', 'AmountVATHidden',
+    'DiscountAmountFC', 'AmountIncludingVATFC',
+    'DescriptionMode', 'VATCodeType',
+    'ItemDivisable', 'GLAccountUseCostcenter', 'GLAccountUseCostunit',
+    'ActionCreateOpportunity', 'ActionUpdateOpportunityAmount', 'UnitHidden',
+  ]);
   const LOG = (...args) => console.log('[ZH-SC]', ...args);
 
   LOG('Script gestart in frame:', window.location.href);
@@ -155,6 +176,73 @@
     return null;
   }
 
+  function collectRowData(rowId, doc) {
+    const prefix = rowId + '_';
+    const data = [];
+    doc.querySelectorAll(`#${rowId} input, #${rowId} select, #${rowId} a[id]`).forEach((el) => {
+      if (!el.id || !el.id.startsWith(prefix)) return;
+      const suffix = el.id.slice(prefix.length);
+      if (SKIP_FIELD_SUFFIXES.has(suffix)) return;
+      if (el.tagName === 'SELECT') {
+        data.push({ suffix, type: 'select', value: el.value, options: [...el.options].map((o) => ({ value: o.value, text: o.text })) });
+      } else if (el.tagName === 'A') {
+        data.push({ suffix, type: 'anchor', value: el.textContent });
+      } else {
+        data.push({ suffix, type: 'input', value: el.value });
+      }
+    });
+    return data;
+  }
+
+  function applyRowData(targetId, data, doc) {
+    data.forEach(({ suffix, type, value, options }) => {
+      const el = doc.getElementById(`${targetId}_${suffix}`);
+      if (!el) return;
+      if (type === 'select') {
+        if (el.options.length === 0 && options?.length > 0) {
+          options.forEach((o) => { const opt = doc.createElement('option'); opt.value = o.value; opt.text = o.text; el.appendChild(opt); });
+        }
+        el.value = value;
+        el.disabled = false;
+      } else if (type === 'anchor') {
+        el.textContent = value;
+      } else {
+        el.value = value;
+      }
+    });
+    try { OnChangePriceEntry(targetId); } catch {}
+  }
+
+  function executeFillFromAbove() {
+    let currentRowId = null;
+    try { currentRowId = window.top.zhLastActiveRowId; } catch {}
+    LOG('fill-from-above: actieve rij:', currentRowId);
+    if (!currentRowId) return;
+
+    for (const doc of getAllDocs()) {
+      if (!doc) continue;
+      const currentRow = doc.getElementById(currentRowId);
+      if (!currentRow) continue;
+
+      let above = currentRow.previousElementSibling;
+      while (above && (
+        !above.id?.startsWith('grd_r') ||
+        above.offsetParent === null ||
+        !above.classList.contains('GridRow')
+      )) {
+        above = above.previousElementSibling;
+      }
+
+      if (!above) { LOG('fill-from-above: geen rij erboven'); return; }
+
+      LOG('fill-from-above: kopiëren van', above.id, 'naar', currentRowId);
+      const data = collectRowData(above.id, doc);
+      applyRowData(currentRowId, data, doc);
+      return;
+    }
+    LOG('fill-from-above: huidige rij niet gevonden');
+  }
+
   function executeShortcut(s) {
     LOG('Sneltoets uitvoeren:', s.label, s.action);
     if (s.action === 'navigate') {
@@ -169,6 +257,8 @@
       } else {
         LOG('WAARSCHUWING: element niet gevonden voor matchType:', s.matchType, 'matchValue:', s.matchValue);
       }
+    } else if (s.action === 'fill-from-above') {
+      executeFillFromAbove();
     }
   }
 
@@ -404,8 +494,39 @@
       .zh-btn-primary:hover { background: #c0603c; }
       .zh-btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
       .zh-btn-secondary:hover { background: #e5e7eb; }
+
+      .zh-sc-presets { border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 4px; display: flex; flex-direction: column; gap: 8px; }
+      .zh-sc-preset-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px;
+      }
+      .zh-sc-preset-item > div { flex: 1; }
+      .zh-sc-preset-keys { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+      .zh-sc-preset-keys input { width: 90px; padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; font-family: monospace; background: #fff; }
+      .zh-sc-preset-added { font-size: 11px; color: #16a34a; font-weight: 500; white-space: nowrap; }
+      .zh-key-conflict { color: #ef4444; font-size: 11px; margin-top: 3px; }
+      input.zh-key-error { border-color: #ef4444 !important; background: #fef2f2 !important; }
     `;
     document.head.appendChild(s);
+  }
+
+  function showKeyConflict(input, excludeId) {
+    const keys = input.value;
+    const conflict = loadShortcuts().find((s) => s.keys === keys && s.id !== excludeId);
+    let warn = input.parentElement.querySelector('.zh-key-conflict');
+    if (!warn) {
+      warn = document.createElement('span');
+      warn.className = 'zh-key-conflict';
+      input.parentElement.appendChild(warn);
+    }
+    if (conflict) {
+      input.classList.add('zh-key-error');
+      warn.textContent = `Al in gebruik door "${conflict.label}"`;
+    } else {
+      input.classList.remove('zh-key-error');
+      warn.textContent = '';
+    }
+    return !!conflict;
   }
 
   // ── Config modal ─────────────────────────────────────────────────────────────
@@ -460,8 +581,31 @@
           }
         </div>
 
+        <div class="zh-sc-presets">
+          <p class="zh-sc-form-title">Presets</p>
+          ${PRESETS.map((p) => {
+            const alreadyAdded = shortcuts.some((s) => s.action === p.action);
+            return `
+              <div class="zh-sc-preset-item">
+                <div>
+                  <div class="zh-sc-item-lbl">${p.label}</div>
+                  <div class="zh-sc-item-sub">${p.description}</div>
+                </div>
+                <div class="zh-sc-preset-keys">
+                  ${alreadyAdded
+                    ? `<span class="zh-sc-preset-added">✓ Toegevoegd</span>`
+                    : `<input class="zh-sc-preset-key-input" data-preset-id="${p.id}" value="${p.defaultKeys}" readonly>
+                       <button class="zh-btn zh-btn-secondary" id="zh-sc-preset-rec-${p.id}" data-preset-id="${p.id}">Opnemen</button>
+                       <button class="zh-btn zh-btn-primary zh-sc-preset-add" data-preset-id="${p.id}">+ Toevoegen</button>`
+                  }
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
         <div class="zh-sc-form">
-          <p class="zh-sc-form-title">Sneltoets toevoegen</p>
+          <p class="zh-sc-form-title">Eigen sneltoets toevoegen</p>
 
           <div class="zh-sc-row">
             <label>Label</label>
@@ -541,6 +685,53 @@
       };
     });
 
+    // Preset key recorder + toevoegen
+    modal.querySelectorAll('.zh-sc-preset-add').forEach((btn) => {
+      const presetId = btn.dataset.presetId;
+      const preset = PRESETS.find((p) => p.id === presetId);
+      if (!preset) return;
+
+      const keyInput = modal.querySelector(`.zh-sc-preset-key-input[data-preset-id="${presetId}"]`);
+      const recBtn = modal.querySelector(`#zh-sc-preset-rec-${presetId}`);
+      let recorder = null;
+
+      recBtn.onclick = () => {
+        if (recorder) {
+          document.removeEventListener('keydown', recorder, true);
+          recorder = null;
+          recBtn.textContent = 'Opnemen';
+          recBtn.style.background = '';
+          return;
+        }
+        keyInput.value = 'Druk toetsen…';
+        recBtn.textContent = 'Stop';
+        recBtn.style.background = '#fef3c7';
+        recorder = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const combo = buildCombo(e);
+          if (!combo) return;
+          keyInput.value = combo;
+          document.removeEventListener('keydown', recorder, true);
+          recorder = null;
+          recBtn.textContent = 'Opnemen';
+          recBtn.style.background = '';
+          showKeyConflict(keyInput, null);
+        };
+        document.addEventListener('keydown', recorder, true);
+      };
+
+      btn.onclick = () => {
+        if (recorder) { document.removeEventListener('keydown', recorder, true); recorder = null; }
+        const keys = keyInput.value.trim();
+        if (!keys || keys.includes('…')) { alert('Neem eerst een toetscombinatie op.'); return; }
+        if (showKeyConflict(keyInput, null)) return;
+        const existing = loadShortcuts();
+        existing.push({ id: Date.now().toString(), label: preset.label, keys, action: preset.action });
+        saveShortcuts(existing);
+        renderModal(modal, null);
+      };
+    });
+
     // Action toggle
     const actionSel = modal.querySelector('#zh-sc-action');
     actionSel.onchange = () => {
@@ -580,6 +771,7 @@
         recordingHandler = null;
         recBtn.textContent = 'Opnemen';
         recBtn.style.background = '';
+        showKeyConflict(keysInput, null);
       };
       document.addEventListener('keydown', recordingHandler, true);
     };
@@ -632,12 +824,7 @@
 
       if (!label) { alert('Vul een label in.'); return; }
       if (!keys || keys.includes('…')) { alert('Neem een toetscombinatie op.'); return; }
-
-      const existing = loadShortcuts();
-      if (existing.some((s) => s.keys === keys)) {
-        alert(`De combinatie "${keys}" is al in gebruik.`);
-        return;
-      }
+      if (showKeyConflict(keysInput, null)) return;
 
       const shortcut = { id: Date.now().toString(), label, keys, action };
 
