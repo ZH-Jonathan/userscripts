@@ -204,11 +204,45 @@
      return titleText.includes('Offerte') || titleText.includes('Verkooporder');
    }
 
+   function setupGridObserver(doc) {
+     const gridContainer = doc.querySelector("table.Grid");
+     if (!gridContainer || gridContainer.dataset.zhObserverSetup) return;
+     gridContainer.dataset.zhObserverSetup = "true";
+
+     const gridBody = gridContainer.querySelector("tbody") || gridContainer;
+     let timeout = null;
+
+     new MutationObserver((mutations) => {
+       const isRelevant = mutations.some((m) => {
+         if (m.type === "childList") {
+           return [...m.addedNodes, ...m.removedNodes].some(
+             (n) => n.nodeType === Node.ELEMENT_NODE && n.id && n.id.startsWith("grd_r")
+           );
+         }
+         if (m.type === "attributes") {
+           return m.target.id && m.target.id.startsWith("grd_r");
+         }
+         return false;
+       });
+
+       if (isRelevant) {
+         clearTimeout(timeout);
+         timeout = setTimeout(() => enhanceOrderGrid(doc), 50);
+       }
+     }).observe(gridBody, {
+       childList: true,
+       subtree: true,
+       attributes: true,
+       attributeFilter: ["style", "class"],
+     });
+   }
+
    function enhanceOrderGrid(doc) {
      if (!isOfferteOrOrder(doc)) return;
 
      injectStyles(doc);
      cleanupRemovedNotes(doc);
+     setupGridObserver(doc);
 
      const rows = Array.from(doc.querySelectorAll("tr.GridRow[id^='grd_r']"));
      rows.forEach((row) => createInlineNoteForRow(row, doc));
@@ -258,6 +292,6 @@
    }
 
    window.addEventListener("load", runEverywhere);
-   setInterval(runEverywhere, 1500);
+   setInterval(runEverywhere, 5000);
    runEverywhere();
  })();
