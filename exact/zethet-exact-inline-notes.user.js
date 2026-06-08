@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Inline Notes
 // @namespace    https://zethet.nl/
-// @version      1.0.5
+// @version      1.0.7
 // @description  Interne ZetHet-aanpassing voor inline notities in Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
@@ -10,6 +10,7 @@
 // @updateURL    https://raw.githubusercontent.com/ZH-Jonathan/userscripts/main/exact/zethet-exact-inline-notes.user.js
 // @downloadURL  https://raw.githubusercontent.com/ZH-Jonathan/userscripts/main/exact/zethet-exact-inline-notes.user.js
 // ==/UserScript==
+
 
 (function () {
    function injectStyles(doc) {
@@ -97,6 +98,7 @@
 
    function createInlineNoteForRow(row, doc) {
      if (!row || !row.id || !row.id.startsWith("grd_r")) return;
+     if (row.offsetParent === null) return; // row is hidden (deleted rows get display:none)
 
      const rowId = row.id;
      const hiddenInput = doc.getElementById(`${rowId}_Notes`);
@@ -180,10 +182,14 @@
 
    function cleanupRemovedNotes(doc) {
      const noteRows = Array.from(doc.querySelectorAll("tr[id^='zh-inline-note-']"));
+
      noteRows.forEach((noteRow) => {
        const forRowId = noteRow.dataset.forRow;
        const originalRow = doc.getElementById(forRowId);
-       if (!originalRow) {
+       const isHidden = !originalRow || originalRow.offsetParent === null;
+       const isAttached = !isHidden && originalRow.nextElementSibling === noteRow;
+
+       if (isHidden || !isAttached) {
          noteRow.remove();
        }
      });
@@ -192,20 +198,16 @@
    function isOfferteOrOrder(doc) {
      const titleElement = doc.querySelector('span.HdrTitle');
      if (!titleElement) {
-       console.log('[ZH Inline Notes] HdrTitle niet gevonden');
        return false;
      }
      const titleText = titleElement.textContent || '';
-     const isMatched = titleText.includes('Offerte') || titleText.includes('Verkooporder');
-     console.log('[ZH Inline Notes] Pagina titel:', titleText, '| Match:', isMatched);
-     return isMatched;
+     return titleText.includes('Offerte') || titleText.includes('Verkooporder');
    }
 
    function enhanceOrderGrid(doc) {
      if (!isOfferteOrOrder(doc)) return;
 
      injectStyles(doc);
-
      cleanupRemovedNotes(doc);
 
      const rows = Array.from(doc.querySelectorAll("tr.GridRow[id^='grd_r']"));
@@ -238,6 +240,11 @@
    }
 
    function runEverywhere() {
+     // Stop het gehele script als er geen Offerte of Verkooporder is
+     if (!isOfferteOrOrder(document)) {
+       return;
+     }
+
      runInDocument(document);
 
      document.querySelectorAll("iframe").forEach((iframe) => {
@@ -249,15 +256,6 @@
        }
      });
    }
-
-   const observer = new MutationObserver(() => {
-     runEverywhere();
-   });
-
-   observer.observe(document.documentElement, {
-     childList: true,
-     subtree: true
-   });
 
    window.addEventListener("load", runEverywhere);
    setInterval(runEverywhere, 1500);
