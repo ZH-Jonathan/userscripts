@@ -35,7 +35,10 @@
     'ItemDivisable', 'GLAccountUseCostcenter', 'GLAccountUseCostunit',
     'ActionCreateOpportunity', 'ActionUpdateOpportunityAmount', 'UnitHidden',
   ]);
-  const LOG = (...args) => console.log('[ZH-SC]', ...args);
+  const _ts = () => new Date().toTimeString().slice(0, 8);
+  const LOG  = (...args) => console.log(`[ZH-SC ${_ts()}]`, ...args);
+  const WARN = (...args) => console.warn(`[ZH-SC ${_ts()}]`, ...args);
+  const ERR  = (...args) => console.error(`[ZH-SC ${_ts()}]`, ...args);
 
   LOG('Script gestart in frame:', window.location.href);
 
@@ -51,12 +54,17 @@
   // ── Storage ──────────────────────────────────────────────────────────────────
 
   function loadShortcuts() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
+    try {
+      const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      LOG('loadShortcuts:', list.length, 'sneltoets(en) geladen');
+      return list;
+    }
+    catch (err) { WARN('loadShortcuts: parse-fout:', err.message); return []; }
   }
 
   function saveShortcuts(s) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    LOG('saveShortcuts:', s.length, 'sneltoets(en) opgeslagen');
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -117,7 +125,7 @@
         }
       }
 
-      if (!rowId) { LOG('WAARSCHUWING: geen actieve rij gevonden'); return null; }
+      if (!rowId) { WARN('geen actieve rij gevonden'); return null; }
 
       for (const doc of docs) {
         if (!doc) continue;
@@ -179,10 +187,11 @@
   function collectRowData(rowId, doc) {
     const prefix = rowId + '_';
     const data = [];
+    let skipped = 0;
     doc.querySelectorAll(`#${rowId} input, #${rowId} select, #${rowId} a[id]`).forEach((el) => {
       if (!el.id || !el.id.startsWith(prefix)) return;
       const suffix = el.id.slice(prefix.length);
-      if (SKIP_FIELD_SUFFIXES.has(suffix)) return;
+      if (SKIP_FIELD_SUFFIXES.has(suffix)) { skipped++; return; }
       if (el.tagName === 'SELECT') {
         data.push({ suffix, type: 'select', value: el.value, options: [...el.options].map((o) => ({ value: o.value, text: o.text })) });
       } else if (el.tagName === 'A') {
@@ -191,13 +200,15 @@
         data.push({ suffix, type: 'input', value: el.value });
       }
     });
+    LOG('collectRowData:', rowId, '—', data.length, 'veld(en) verzameld,', skipped, 'overgeslagen');
     return data;
   }
 
   function applyRowData(targetId, data, doc) {
+    let applied = 0, missing = 0;
     data.forEach(({ suffix, type, value, options }) => {
       const el = doc.getElementById(`${targetId}_${suffix}`);
-      if (!el) return;
+      if (!el) { LOG('applyRowData: veld niet gevonden:', suffix); missing++; return; }
       if (type === 'select') {
         if (el.options.length === 0 && options?.length > 0) {
           options.forEach((o) => { const opt = doc.createElement('option'); opt.value = o.value; opt.text = o.text; el.appendChild(opt); });
@@ -209,8 +220,11 @@
       } else {
         el.value = value;
       }
+      applied++;
     });
-    try { OnChangePriceEntry(targetId); } catch {}
+    LOG('applyRowData:', targetId, '—', applied, 'veld(en) ingevuld,', missing, 'niet gevonden');
+    try { OnChangePriceEntry(targetId); LOG('OnChangePriceEntry aangeroepen'); }
+    catch (err) { LOG('OnChangePriceEntry niet beschikbaar:', err.message); }
   }
 
   function executeFillFromAbove() {
@@ -255,7 +269,7 @@
         LOG('Element gevonden, klikken:', el);
         el.click();
       } else {
-        LOG('WAARSCHUWING: element niet gevonden voor matchType:', s.matchType, 'matchValue:', s.matchValue);
+        WARN('element niet gevonden — matchType:', s.matchType, 'matchValue:', s.matchValue);
       }
     } else if (s.action === 'fill-from-above') {
       executeFillFromAbove();
@@ -273,7 +287,7 @@
     if (combo === CONFIG_COMBO) {
       e.preventDefault();
       LOG('Config openen via toetsenbord');
-      try { window.top.zhExactShortcutsOpen(); } catch (err) { LOG('FOUT bij openen config:', err); }
+      try { window.top.zhExactShortcutsOpen(); } catch (err) { ERR('FOUT bij openen config:', err); }
       return;
     }
 
