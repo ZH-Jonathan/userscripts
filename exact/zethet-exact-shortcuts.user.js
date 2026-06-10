@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Sneltoetsen
 // @namespace    https://zethet.nl/
-// @version      1.0.1
+// @version      1.0.3
 // @description  Interne ZetHet-aanpassing: configureerbare sneltoetsen voor Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
