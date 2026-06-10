@@ -20,7 +20,7 @@
       id: 'fill-from-above',
       label: 'Rij erboven kopiëren',
       description: 'Vult de huidige rij met de data van de rij erboven',
-      defaultKeys: 'Shift+B',
+      defaultKeys: 'Ctrl+B',
       action: 'fill-from-above',
     },
   ];
