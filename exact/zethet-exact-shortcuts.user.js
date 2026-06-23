@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Sneltoetsen
 // @namespace    https://zethet.nl/
-// @version      1.0.3
+// @version      1.0.5
 // @description  Interne ZetHet-aanpassing: configureerbare sneltoetsen voor Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
@@ -41,6 +41,27 @@
   const ERR  = (...args) => console.error(`[ZH-SC ${_ts()}]`, ...args);
 
   LOG('Script gestart in frame:', window.location.href);
+  LOG('Browser:', navigator.userAgent);
+  LOG('Taal/locale:', navigator.language, navigator.languages?.join(', '));
+  LOG('Platform:', navigator.platform);
+  LOG('Is top frame:', window === window.top);
+
+  // localStorage beschikbaarheid controleren bij opstart
+  try {
+    localStorage.setItem('zh-sc-test', '1');
+    localStorage.removeItem('zh-sc-test');
+    LOG('localStorage: beschikbaar');
+  } catch (err) {
+    ERR('localStorage NIET beschikbaar:', err.message, '— sneltoetsen kunnen niet geladen worden!');
+  }
+
+  // Bestaande sneltoetsen loggen bij opstart
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    LOG('localStorage raw bij opstart:', raw ?? '(leeg / niet aanwezig)');
+  } catch (err) {
+    ERR('localStorage lezen mislukt bij opstart:', err.message);
+  }
 
   // Bijhouden welke rij het laatst focus had (in elk frame)
   document.addEventListener('focusin', (e) => {
@@ -55,8 +76,13 @@
 
   function loadShortcuts() {
     try {
-      const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      LOG('loadShortcuts:', list.length, 'sneltoets(en) geladen');
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw === null) {
+        WARN('loadShortcuts: STORAGE_KEY "' + STORAGE_KEY + '" niet gevonden in localStorage — zijn de sneltoetsen wel geconfigureerd in deze browser?');
+        return [];
+      }
+      const list = JSON.parse(raw);
+      LOG('loadShortcuts:', list.length, 'sneltoets(en) geladen:', JSON.stringify(list));
       return list;
     }
     catch (err) { WARN('loadShortcuts: parse-fout:', err.message); return []; }
@@ -79,7 +105,11 @@
     if (!['Control', 'Alt', 'Shift', 'Meta'].includes(k)) {
       parts.push(k.length === 1 ? k.toUpperCase() : k);
     }
-    return parts.length >= 2 ? parts.join('+') : '';
+    const combo = parts.length >= 2 ? parts.join('+') : '';
+    LOG('buildCombo — key:', JSON.stringify(k), '| code:', e.code, '| keyCode:', e.keyCode,
+        '| ctrl:', e.ctrlKey, '| alt:', e.altKey, '| shift:', e.shiftKey, '| meta:', e.metaKey,
+        '| result:', combo || '(leeg, modifier alleen)');
+    return combo;
   }
 
   function describeElement(el) {
@@ -229,9 +259,12 @@
 
   function executeFillFromAbove() {
     let currentRowId = null;
-    try { currentRowId = window.top.zhLastActiveRowId; } catch {}
+    try { currentRowId = window.top.zhLastActiveRowId; } catch (err) { ERR('fill-from-above: kan window.top niet bereiken:', err.message); }
     LOG('fill-from-above: actieve rij:', currentRowId);
-    if (!currentRowId) return;
+    if (!currentRowId) {
+      WARN('fill-from-above: geen actieve rij bekend — klik eerst in een rij voordat je de sneltoets gebruikt');
+      return;
+    }
 
     for (const doc of getAllDocs()) {
       if (!doc) continue;
@@ -279,10 +312,16 @@
   // ── Keyboard listener (every frame) ─────────────────────────────────────────
 
   document.addEventListener('keydown', (e) => {
-    const combo = buildCombo(e);
-    if (!combo) return;
+    LOG('keydown ontvangen — activeElement:', document.activeElement?.tagName, document.activeElement?.id || '(geen id)',
+        '| defaultPrevented al:', e.defaultPrevented, '| frame:', window.location.href);
 
-    LOG('Toetscombinatie:', combo, '| frame:', window.location.href);
+    const combo = buildCombo(e);
+    if (!combo) {
+      LOG('Geen combinatie (alleen modifier), keydown genegeerd');
+      return;
+    }
+
+    LOG('Toetscombinatie gebouwd:', combo, '| frame:', window.location.href);
 
     if (combo === CONFIG_COMBO) {
       e.preventDefault();
@@ -292,12 +331,16 @@
     }
 
     const shortcuts = loadShortcuts();
-    LOG('Beschikbare sneltoetsen:', shortcuts.map((s) => s.keys));
+    LOG('Beschikbare sneltoetsen in storage:', shortcuts.length,
+        '—', shortcuts.map((s) => `"${s.label}" [${s.keys}]`).join(', ') || '(geen)');
+
     const match = shortcuts.find((s) => s.keys === combo);
     if (match) {
-      LOG('Match gevonden:', match.label);
+      LOG('Match gevonden:', match.label, '| actie:', match.action);
       e.preventDefault();
       executeShortcut(match);
+    } else {
+      LOG('Geen match voor combo:', combo, '— sneltoets niet uitgevoerd');
     }
   });
 
