@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Sneltoetsen
 // @namespace    https://zethet.nl/
-// @version      1.0.5
+// @version      1.0.6
 // @description  Interne ZetHet-aanpassing: configureerbare sneltoetsen voor Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
@@ -95,12 +95,17 @@
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
+  const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
   function buildCombo(e) {
     const parts = [];
-    if (e.ctrlKey) parts.push('Ctrl');
+    // Op Mac: behandel Meta (Cmd) als Ctrl zodat sneltoetsen werken ongeacht
+    // of iemand de modifier-toetsen heeft omgewisseld in Systeeminstellingen.
+    const hasCtrl = e.ctrlKey || (IS_MAC && e.metaKey);
+    if (hasCtrl) parts.push('Ctrl');
     if (e.altKey) parts.push('Alt');
     if (e.shiftKey) parts.push('Shift');
-    if (e.metaKey) parts.push('Meta');
+    if (e.metaKey && !IS_MAC) parts.push('Meta');
     const k = e.key;
     if (!['Control', 'Alt', 'Shift', 'Meta'].includes(k)) {
       parts.push(k.length === 1 ? k.toUpperCase() : k);
@@ -108,7 +113,7 @@
     const combo = parts.length >= 2 ? parts.join('+') : '';
     LOG('buildCombo — key:', JSON.stringify(k), '| code:', e.code, '| keyCode:', e.keyCode,
         '| ctrl:', e.ctrlKey, '| alt:', e.altKey, '| shift:', e.shiftKey, '| meta:', e.metaKey,
-        '| result:', combo || '(leeg, modifier alleen)');
+        '| isMac:', IS_MAC, '| hasCtrl:', hasCtrl, '| result:', combo || '(leeg, modifier alleen)');
     return combo;
   }
 
