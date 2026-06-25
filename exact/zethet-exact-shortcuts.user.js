@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ZetHet Exact Sneltoetsen
 // @namespace    https://zethet.nl/
-// @version      1.0.6
+// @version      1.0.7
 // @description  Interne ZetHet-aanpassing: configureerbare sneltoetsen voor Exact Online
 // @match        https://start.exactonline.nl/*
 // @run-at       document-idle
@@ -903,6 +903,7 @@
         if (rowStrategyEl) shortcut.rowStrategy = rowStrategyEl.value;
       }
 
+      const existing = loadShortcuts();
       existing.push(shortcut);
       saveShortcuts(existing);
       renderModal(modal, null);
